@@ -24,6 +24,7 @@ void compress_lzss(FILE *in, FILE *out) {
     int count = 0;
 
     while ((bytes_read = fread(lookahead, 1, LOOKAHEAD_SIZE, in)) > 0) {
+        // printf("%ld", bytes_read);
         int best_offset = 0;
         int best_length = 0;
 
@@ -32,9 +33,12 @@ void compress_lzss(FILE *in, FILE *out) {
                 //match!!
                 int current_length = 1;
                 int current_offset = i;
-                for (int j = 1; (j < LOOKAHEAD_SIZE) && (i+j) < position; j++) {
-                    if (sliding_window[i+j] == lookahead[j]) {
-                        current_length++;
+                for (int j = 1; j < bytes_read; j++) {
+                    if (i+j < position) {
+                        if (sliding_window[i+j] == lookahead[j]) {
+                            current_length++;
+                        }
+                        else { break; }
                     }
                     else { break; }
                 }
@@ -66,10 +70,11 @@ void compress_lzss(FILE *in, FILE *out) {
 
         if (count == 8) {
             fputc(flag, out);
-            printf("0x%02X", flag);
+            //printf("0x%02X", flag);
             flag = 0;
             count = 0;
         } else { count++; }
+        printf("%s\n", lookahead);
     }
 }
 
