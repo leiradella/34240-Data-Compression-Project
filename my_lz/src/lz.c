@@ -109,4 +109,45 @@ void decompress_lzss(FILE *in, FILE *out) {
     // TODO: Read flag byte, then interpret next 8 items accordingly
     // If literal, write to output
     // If (offset, length), copy from sliding window
+
+    unsigned char flag;
+    unsigned char sliding_window[WINDOW_SIZE] = {0};
+    int position = 0;
+
+    while (((flag = fgetc(in)) != EOF)) {
+        for (int i = 0; i < 8; i++) {
+            if (flag & (1 << (7 - i))) { //single byte
+                int c = fgetc(in);
+                if (c == EOF) return;
+                fputc(c, out);
+
+                sliding_window[position] = (unsigned char)c;
+                position++;
+
+                if (position >= WINDOW_SIZE) {
+                    memmove(sliding_window, sliding_window + 1, WINDOW_SIZE - 1);
+                    position = WINDOW_SIZE - 1;
+                }
+            } else { //match
+                int b1 = fgetc(in);
+                int b2 = fgetc(in);
+
+                if (b1 == EOF || b2 == EOF) return;
+                
+                int offset = (b1 << 4) | (b2 >> 4);
+                int length = b2 & 0x0F;
+
+                for (int j = 0; j < length; j++) {
+                    unsigned char c = sliding_window[(position - offset + j)];
+                    fputc(c, out);
+                    sliding_window[position] = c;
+                    position++;
+                    if (position >= WINDOW_SIZE) {
+                        memmove(sliding_window, sliding_window + 1, WINDOW_SIZE - 1);
+                        position = WINDOW_SIZE - 1;
+                    }
+                }
+            }
+        }
+    }
 }
