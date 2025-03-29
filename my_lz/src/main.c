@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include "../headers/lz.h"
 
+#define MAX_FILENAME_SIZE 256
+
 int main(int argc, char *argv[]) {
     if (argc < 4) {
         printf("Usage: %s [c|d] input output\n", argv[0]);
@@ -11,8 +13,8 @@ int main(int argc, char *argv[]) {
     FILE *in = fopen(argv[2], "r");
 
     if (in == NULL) {
-        char msg[256];
-        snprintf(msg, 256, "File error %s", argv[2]);
+        char msg[MAX_FILENAME_SIZE];
+        snprintf(msg, MAX_FILENAME_SIZE, "File error %s", argv[2]);
         perror(msg);
         return 1;
     }
@@ -20,8 +22,8 @@ int main(int argc, char *argv[]) {
     FILE *out = fopen(argv[3], "w");
 
     if (out == NULL) {
-        char msg[256];
-        snprintf(msg, 256, "File error %s", argv[3]);
+        char msg[MAX_FILENAME_SIZE];
+        snprintf(msg, MAX_FILENAME_SIZE, "File error %s", argv[3]);
         perror(msg);
         return 1;
     }

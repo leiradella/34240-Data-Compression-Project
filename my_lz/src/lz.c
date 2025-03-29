@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "../headers/lz.h"
 
 #define WINDOW_SIZE 4096
@@ -11,16 +12,16 @@
 void compress_lzss(FILE *in, FILE *out) {
 
     //total buffer size is sliding window size + lookahead size
-    unsigned char sliding_window[WINDOW_SIZE] = {0};
-    unsigned char lookahead[LOOKAHEAD_SIZE] = {0};
+    uint8_t sliding_window[WINDOW_SIZE] = {0};
+    uint8_t lookahead[LOOKAHEAD_SIZE] = {0};
 
     //initialize the position which tells us how much data is in the sliding window
     size_t bytes_read;
     int position = 0;
     int count = 0;
     int output_index = 0;
-    unsigned char flag = 0;
-    unsigned char output[16];
+    uint8_t flag = 0;
+    uint8_t output[16];
 
     int lookahead_filled = fread(lookahead, 1, LOOKAHEAD_SIZE, in);
 
@@ -47,6 +48,9 @@ void compress_lzss(FILE *in, FILE *out) {
                     best_offset = current_offset;
                 }
             }
+        }
+        if (best_length > 15){
+            best_length = 15; //max length is 15
         }
         int length = 0;
         if (best_length < MIN_MATCH_LENGTH) { //single
@@ -75,10 +79,11 @@ void compress_lzss(FILE *in, FILE *out) {
             //first we shift the offset to right 4 times to get just 8 bits into b1
             //then we place the other 4 bits of offset at the start of b2
             //and place the 4 lenght bits at the end of b2
-            unsigned int offset = position - best_offset - length;
+            unsigned int offset = (position - length) - best_offset;
             unsigned int output_length = length;
-            unsigned char b1 = (offset >> 4) & 0xFF;
-            unsigned char b2 = ((offset & 0x0F) << 4 | (output_length & 0x0F));
+
+            uint8_t b1 = (offset >> 4) & 0xFF;
+            uint8_t b2 = ((offset & 0x0F) << 4 | (output_length & 0x0F));
             output[output_index] = b1;
             output_index++;
             output[output_index] = b2;
@@ -92,7 +97,7 @@ void compress_lzss(FILE *in, FILE *out) {
             flag = 0;
             count = 0;
             output_index = 0;
-        } else { count++; }
+        } else count++;
 
         memmove(lookahead, lookahead + length, LOOKAHEAD_SIZE - length);
         lookahead_filled += fread(lookahead + lookahead_filled, 1, LOOKAHEAD_SIZE - lookahead_filled, in);
@@ -106,12 +111,8 @@ void compress_lzss(FILE *in, FILE *out) {
 }
 
 void decompress_lzss(FILE *in, FILE *out) {
-    // TODO: Read flag byte, then interpret next 8 items accordingly
-    // If literal, write to output
-    // If (offset, length), copy from sliding window
-
-    unsigned char flag;
-    unsigned char sliding_window[WINDOW_SIZE] = {0};
+    uint8_t flag;
+    uint8_t sliding_window[WINDOW_SIZE] = {0};
     int position = 0;
 
     while (((flag = fgetc(in)) != EOF)) {
@@ -121,7 +122,7 @@ void decompress_lzss(FILE *in, FILE *out) {
                 if (c == EOF) return;
                 fputc(c, out);
 
-                sliding_window[position] = (unsigned char)c;
+                sliding_window[position] = (uint8_t)c;
                 position++;
 
                 if (position >= WINDOW_SIZE) {
@@ -134,17 +135,25 @@ void decompress_lzss(FILE *in, FILE *out) {
 
                 if (b1 == EOF || b2 == EOF) return;
                 
-                int offset = (b1 << 4) | (b2 >> 4);
+                int offset = (b1 << 4) | ((b2 & 0xF0) >> 4);
                 int length = b2 & 0x0F;
 
+                if (offset > position) {
+                    fprintf(stderr, "Error: Invalid offset %d, position %d\n", offset, position);
+                    return;
+                }
+
+                int start_position = position - offset;
+
                 for (int j = 0; j < length; j++) {
-                    unsigned char c = sliding_window[(position - offset + j)];
+                    uint8_t c = sliding_window[(start_position + j)];
                     fputc(c, out);
                     sliding_window[position] = c;
                     position++;
                     if (position >= WINDOW_SIZE) {
                         memmove(sliding_window, sliding_window + 1, WINDOW_SIZE - 1);
                         position = WINDOW_SIZE - 1;
+                        start_position--;
                     }
                 }
             }
