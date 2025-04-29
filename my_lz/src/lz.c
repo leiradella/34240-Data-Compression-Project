@@ -8,7 +8,6 @@
 #define LOOKAHEAD_SIZE 18
 #define MIN_MATCH_LENGTH 3
 
-
 void compress_lzss(FILE *in, FILE *out) {
 
     //total buffer size is sliding window size + lookahead size
@@ -16,10 +15,11 @@ void compress_lzss(FILE *in, FILE *out) {
     uint8_t lookahead[LOOKAHEAD_SIZE] = {0};
 
     //initialize the position which tells us how much data is in the sliding window
-    size_t bytes_read;
     int position = 0;
     int count = 0;
     int output_index = 0;
+    int entry_sizes[8];
+    size_t bytes_read;
     uint8_t flag = 0;
     uint8_t output[16];
 
@@ -49,7 +49,7 @@ void compress_lzss(FILE *in, FILE *out) {
                 }
             }
         }
-        if (best_length > 15){
+        if (best_length > 15) {
             best_length = 15; //max length is 15
         }
         int length = 0;
@@ -62,9 +62,10 @@ void compress_lzss(FILE *in, FILE *out) {
         } else { //match
             length = best_length;
         }
-        if (position + length > WINDOW_SIZE) {
+        if (position + length >= WINDOW_SIZE) {
             memmove(sliding_window, sliding_window + length, WINDOW_SIZE - length);
-            position = WINDOW_SIZE - length;
+            position = WINDOW_SIZE - length - 1;
+            best_offset -= length;
         }
         memcpy(sliding_window + position, lookahead, length);
         position += length;
@@ -74,16 +75,17 @@ void compress_lzss(FILE *in, FILE *out) {
         if (length == 1) {
             output[output_index] = lookahead[0];
             output_index++;
+            entry_sizes[count] = 1;
         } else {
             //the 2 output bytes are 12 bits offset 4 bits length
             //first we shift the offset to right 4 times to get just 8 bits into b1
             //then we place the other 4 bits of offset at the start of b2
             //and place the 4 lenght bits at the end of b2
-            unsigned int offset = (position - length) - best_offset;
-            unsigned int output_length = length;
+            entry_sizes[count] = 2;
 
+            unsigned int offset = (position - length) - best_offset;
             uint8_t b1 = (offset >> 4) & 0xFF;
-            uint8_t b2 = ((offset & 0x0F) << 4 | (output_length & 0x0F));
+            uint8_t b2 = ((offset & 0x0F) << 4 | (length & 0x0F));
             output[output_index] = b1;
             output_index++;
             output[output_index] = b2;
@@ -102,12 +104,14 @@ void compress_lzss(FILE *in, FILE *out) {
         memmove(lookahead, lookahead + length, LOOKAHEAD_SIZE - length);
         lookahead_filled += fread(lookahead + lookahead_filled, 1, LOOKAHEAD_SIZE - lookahead_filled, in);
     }
-
-    //add any partial data left
-    if (count > 0) {
-        fputc(flag, out);
-        fwrite(output, 1, output_index, out);
+    while (count < 8) {
+        // pad with 0 (match), and dummy offset/length (safe and decodes to 0-length)
+        output[output_index++] = 0;
+        output[output_index++] = 0;
+        count++;
     }
+    fputc(flag, out);
+    fwrite(output, 1, output_index, out);
 }
 
 void decompress_lzss(FILE *in, FILE *out) {
@@ -127,11 +131,11 @@ void decompress_lzss(FILE *in, FILE *out) {
 
                 if (position >= WINDOW_SIZE) {
                     memmove(sliding_window, sliding_window + 1, WINDOW_SIZE - 1);
-                    position = WINDOW_SIZE - 1;
+                    position--;
                 }
             } else { //match
-                int b1 = fgetc(in);
-                int b2 = fgetc(in);
+                uint8_t b1 = fgetc(in);
+                uint8_t b2 = fgetc(in);
 
                 if (b1 == EOF || b2 == EOF) return;
                 
@@ -152,7 +156,7 @@ void decompress_lzss(FILE *in, FILE *out) {
                     position++;
                     if (position >= WINDOW_SIZE) {
                         memmove(sliding_window, sliding_window + 1, WINDOW_SIZE - 1);
-                        position = WINDOW_SIZE - 1;
+                        position--;
                         start_position--;
                     }
                 }
