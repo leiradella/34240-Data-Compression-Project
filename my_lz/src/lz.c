@@ -119,7 +119,7 @@ void decompress_lzss(FILE *in, FILE *out) {
     uint8_t sliding_window[WINDOW_SIZE] = {0};
     int position = 0;
 
-    while (((flag = fgetc(in)) != EOF)) {
+    while (fread(&flag, 1, 1, in) == 1) {
         for (int i = 0; i < 8; i++) {
             if (flag & (1 << (7 - i))) { //single byte
                 int c = fgetc(in);
@@ -134,11 +134,11 @@ void decompress_lzss(FILE *in, FILE *out) {
                     position--;
                 }
             } else { //match
-                uint8_t b1 = fgetc(in);
-                uint8_t b2 = fgetc(in);
+                uint8_t b1; 
+                uint8_t b2;
 
-                if (b1 == EOF || b2 == EOF) return;
-                
+                if (fread(&b1, 1, 1, in) != 1 || fread(&b2, 1, 1, in) != 1) { return; }
+
                 int offset = (b1 << 4) | ((b2 & 0xF0) >> 4);
                 int length = b2 & 0x0F;
 
