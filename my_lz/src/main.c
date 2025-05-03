@@ -3,88 +3,141 @@
 #include <string.h>
 #include "../headers/lz.h"
 #include "../headers/huffman.h"
-
-#define MAX_FILENAME_SIZE 256
-
-//./mylz c filename
+#include "../headers/utils.h"
 
 int main(int argc, char *argv[]) {
-    //file paths for input and output
-    char in_filepath[MAX_FILENAME_SIZE];
-    char out_filepath[MAX_FILENAME_SIZE];
+    //parse the command line arguments
+    ProgramOptions options = parse_arguments(argc, argv);
 
-    //check if the minimum number of arguments is met
-    if (argc < 3) {
-        printf("Usage: %s [c|d] filename\n", argv[0]);
-        return 1;
-    }
+    printf("Compress: %d\n", options.compress);
+    printf("Decompress: %d\n", options.decompress);
+    printf("Use Huffman: %d\n", options.use_huffman);
+    printf("Use Lossy: %d\n", options.use_lossy);
+    printf("Quantization Factor: %d\n", options.quantization_factor);
+    printf("Input Filename: %s\n", options.input_filename);
+    
+    //open the input file
+    FILE *in = open_file(options.input_filename, "rb");
 
-    //get the filename and open the according files depending on whether it is
-    //compressing (c): input = tests/files/filename, output = tests/compressed/filename
-    //decompressing (d): input = tests/compressed/filename, output = tests/decompressed/filename
-    if (argv[1][0] == 'c') {
-        snprintf(in_filepath, MAX_FILENAME_SIZE, "tests/files/%s", argv[2]);
-        snprintf(out_filepath, MAX_FILENAME_SIZE, "tests/compressed/%s.lz", argv[2]);
-    } else if (argv[1][0] == 'd') {
-        snprintf(in_filepath, MAX_FILENAME_SIZE, "tests/compressed/%s.lz", argv[2]);
-        snprintf(out_filepath, MAX_FILENAME_SIZE, "tests/decompressed/%s", argv[2]);
-    } else {
-        printf("Unknown mode '%s'\n", argv[1]);
-        return 1;
-    }
+    //quantization
+    if (options.use_lossy == 1) {
+        if (options.compress == 0) {
+            perror("Quantization can only be used with compression. Use -c option.");
+            exit(1);
+        }
 
-    //open the input file and check for any errors
-    FILE *in = fopen(in_filepath, "rb");
-    if (in == NULL) {
-        char msg[MAX_FILENAME_SIZE];
-        snprintf(msg, MAX_FILENAME_SIZE + 19, "INPUT: File error %s", in_filepath);
-        perror(msg);
-        return 1;
-    }
-    //open the output file and check for any errors
-    FILE *out = fopen(out_filepath, "wb");
-    if (out == NULL) {
-        char msg[MAX_FILENAME_SIZE];
-        snprintf(msg, MAX_FILENAME_SIZE + 19, "OUTPUT: File error %s", out_filepath);
-        perror(msg);
+        FILE *temp = open_file("temp.qz", "wb");
+        //quantize the input file
+        quantize(in, temp, options.quantization_factor);
         fclose(in);
-        return 1;
+        fclose(temp);
+
+        //reopen in as the quantized file
+        in = open_file("temp.qz", "rb");
     }
 
-    // check whether compressing or decompressing and call the appropriate function
-    // closes if its not 'c' or 'd'
-    if (argv[1][0] == 'c') {
-        //open a temporary file to store the data between lzss and huffman
-        //then compress using lzzs then apply huffman and close the temp file
-        FILE *temp = fopen("tests/temp", "wb");
-        compress_lzss(in, temp);
-        fclose(temp);
+    //compression and decompression
+    if (options.compress == 1) {
+        if (options.use_huffman == 1) {
+            //create temp file
+            FILE *temp = open_file("temp.lz", "wb");
 
-        //now reopen the temp file and compress using huffman
-        temp = fopen("tests/temp", "rb");
-        compress_huffman(temp, out);
-        fclose(temp);
-    } else if (argv[1][0] == 'd') {
-        //open a temporary file to store the data between huffman and lzss
-        //then decompress using huffman then apply lzss and close the temp file
-        FILE *temp = fopen("tests/temp", "wb");
-        decompress_huffman(in, temp);
-        fclose(temp);
+            //compress the input using lzss
+            compress_lzss(in, temp);
+            fclose(in);
+            fclose(temp);
 
-        //now reopen the temp file and decompress using lzss
-        temp = fopen("tests/temp", "rb");
-        decompress_lzss(temp, out);
-        fclose(temp);
+            //create output file
+            char output_filename[MAX_FILENAME_SIZE];
+            snprintf(output_filename, MAX_FILENAME_SIZE, "%s.lz.huff", options.input_filename);
+            FILE *out = open_file(output_filename, "wb");
 
+            temp = open_file("temp.lz", "rb");
+
+            //compress the lzss file using huffman
+            compress_huffman(temp, out);
+
+            //close the files
+            fclose(temp);
+            fclose(out);
+
+            //remove temp file
+            remove("temp.lz");
+        } else {
+            //create output file
+            char output_filename[MAX_FILENAME_SIZE];
+            snprintf(output_filename, MAX_FILENAME_SIZE, "%s.lz", options.input_filename);
+            FILE *out = open_file(output_filename, "wb");
+
+            //compress the input using lzss
+            compress_lzss(in, out);
+
+            //close the files
+            fclose(in);
+            fclose(out);
+        }
+    } else if (options.decompress == 1) {
+        //first we get the file extension to determine the decompression method
+        char *dot_extension = strrchr(options.input_filename, '.');
+        if (dot_extension == NULL) {
+            perror("Invalid file extension for decompression. Expected .lz or .lz.huff");
+            exit(1);
+        }
+
+        //if its just .lz we decompress using lzss
+        if (strcmp(dot_extension, ".lz") == 0) {
+            //remove the extension
+            dot_extension[0] = '\0';
+
+            //now create the output file
+            FILE *out = open_file(options.input_filename, "wb");
+
+            //decompress the input using lzss
+            decompress_lzss(in, out);
+            fclose(in);
+            fclose(out);
+        } else if (strcmp(dot_extension, ".huff") == 0) {
+            //remove the .huff extension
+            dot_extension[0] = '\0';
+            //get the .lz extension
+            dot_extension = strrchr(options.input_filename, '.');
+            //remove it as well
+            dot_extension[0] = '\0';
+
+            //create a temp file for the huffman decompression
+            FILE *temp = open_file("temp.lz", "wb");
+
+            //decompress the input using huffman and lzss
+            decompress_huffman(in, temp);
+
+            //close the temp file
+            fclose(temp);
+
+            //now create the output file
+            FILE *out = open_file(options.input_filename, "wb");       
+
+            //open the temp file for reading
+            temp = open_file("temp.lz", "rb");
+            
+            //decompress the temp file using lzss
+            decompress_lzss(temp, out);
+
+            //close the files
+            fclose(in);
+            fclose(temp);
+            fclose(out);
+
+            //remove the temp file
+            remove("temp.lz");
+        }
     } else {
-        printf("Unknown mode '%s'\n", argv[1]);
-        fclose(in);
-        fclose(out);
+        perror("Invalid option. Use -c for compression or -d for decompression.");
         return 1;
     }
 
-    remove("tests/temp"); //remove the temp file
-    fclose(in);
-    fclose(out);
+    if (options.use_lossy == 1) {
+        //remove the quantized file
+        remove("temp.qz");
+    }
     return 0;
 }
