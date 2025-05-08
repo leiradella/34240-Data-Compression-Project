@@ -43,7 +43,6 @@ int main(int argc, char *argv[]) {
             FILE *temp = open_file("temp.lz", "wb");
 
             //compress the input using lzss
-            printf("lzssing...\n");
             compress_lzss(in, temp);
             fclose(in);
             fclose(temp);
@@ -56,7 +55,6 @@ int main(int argc, char *argv[]) {
             temp = open_file("temp.lz", "rb");
 
             //compress the lzss file using huffman
-            printf("huffmaning...\n");
             compress_huffman(temp, out);
 
             //close the files
