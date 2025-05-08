@@ -1,13 +1,12 @@
 #include "../headers/utils.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 FILE *open_file(const char *filename, const char *mode) {
     FILE *file = fopen(filename, mode);
     if (file == NULL) {
-        char error_message[MAX_FILENAME_SIZE];
-        snprintf(error_message, MAX_FILENAME_SIZE, "Error opening file: %s", filename);
-        perror(error_message);
+        printf("error opening file: %s\n", filename);
         exit(1);
     }
     return file;
@@ -38,11 +37,11 @@ ProgramOptions parse_arguments(int argc, char *argv[]) {
                             if (argv[i+1][0] != '-') {
                                 options.input_filename = argv[i+1];
                             } else {
-                                perror("Input filename not set\n");
+                                printf("Input filename not set\n");
                                 exit(1);
                             }
                         } else {
-                            perror("Input filename not set\n");
+                            printf("Input filename not set\n");
                             exit(1);
                         }
                         break;
@@ -65,19 +64,19 @@ ProgramOptions parse_arguments(int argc, char *argv[]) {
 
     //check if the input filename is set
     if (options.input_filename == NULL) {
-        perror("Input filename not set\n");
+        printf("Input filename not set\n");
         exit(1);
     }
 
     //check if there is a valid option set
     if (options.compress == 0 && options.decompress == 0) {
-        perror("Either compress or decompress must be set\n");
+        printf("Either compress or decompress must be set\n");
         exit(1);
     }
 
     //check if both compress and decompress are set (not allowed)
     if (options.compress == 1 && options.decompress == 1) {
-        perror("Cannot set both compress and decompress\n");
+        printf("Cannot set both compress and decompress\n");
         exit(1);
     }
 
@@ -88,8 +87,49 @@ ProgramOptions parse_arguments(int argc, char *argv[]) {
     return options;
 }
 
-void quantize(FILE *in, FILE *out, int quantization_factor) {
+void copy_header(FILE *in, FILE *out, char *filename) {
+    //first find out the file type
+    char *dot_extension = strrchr(filename, '.');
+
+    if (dot_extension == NULL) {
+        printf("Invalid file type\n");
+        exit(1);
+    }
+
+    //move 1 byte forward to skip the dot
+    char *extension = dot_extension + 1;
+
+    if (strcmp(extension, "bmp") == 0) {
+        int header_size = 54; // BMP header size
+        for (int i = 0; i < header_size; i++) {
+            int c = fgetc(in);
+            if (c == EOF) {
+                printf("Error reading BMP header\n");
+                exit(1);
+            }
+            fputc(c, out);
+        }
+    } else if (strcmp(extension, "tiff") == 0) {
+        int header_size = 8; // TIFF header size
+        for (int i = 0; i < header_size; i++) {
+            int c = fgetc(in);
+            if (c == EOF) {
+                printf("Error reading TIFF header\n");
+                exit(1);
+            }
+            fputc(c, out);
+        }
+    } else {
+        printf("Only .bmp and .tiff are supported for lossy compression\n");
+        exit(1);
+    }
+}
+
+void quantize(FILE *in, FILE *out, char *filename, int quantization_factor) {
     int c;
+
+    //copy header
+    copy_header(in, out, filename);
 
     //loop through the input file and quantize the data
     while ((c = fgetc(in)) != EOF) {

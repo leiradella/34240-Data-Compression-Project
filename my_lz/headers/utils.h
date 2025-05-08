@@ -19,6 +19,6 @@ FILE *open_file(const char *filename, const char *mode);
 
 ProgramOptions parse_arguments(int argc, char *argv[]);
 
-void quantize(FILE *in, FILE *out, int quantization_factor);
+void quantize(FILE *in, FILE *out, char *filename, int quantization_factor);
 
 #endif

@@ -22,13 +22,13 @@ int main(int argc, char *argv[]) {
     //quantization
     if (options.use_lossy == 1) {
         if (options.compress == 0) {
-            perror("Quantization can only be used with compression. Use -c option.");
+            printf("Quantization can only be used with compression. Use -c option.");
             exit(1);
         }
 
         FILE *temp = open_file("temp.qz", "wb");
         //quantize the input file
-        quantize(in, temp, options.quantization_factor);
+        quantize(in, temp, options.input_filename, options.quantization_factor);
         fclose(in);
         fclose(temp);
 
@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {
             FILE *temp = open_file("temp.lz", "wb");
 
             //compress the input using lzss
+            printf("lzssing...\n");
             compress_lzss(in, temp);
             fclose(in);
             fclose(temp);
@@ -55,6 +56,7 @@ int main(int argc, char *argv[]) {
             temp = open_file("temp.lz", "rb");
 
             //compress the lzss file using huffman
+            printf("huffmaning...\n");
             compress_huffman(temp, out);
 
             //close the files
@@ -80,7 +82,7 @@ int main(int argc, char *argv[]) {
         //first we get the file extension to determine the decompression method
         char *dot_extension = strrchr(options.input_filename, '.');
         if (dot_extension == NULL) {
-            perror("Invalid file extension for decompression. Expected .lz or .lz.huff");
+            printf("Invalid file extension for decompression. Expected .lz or .lz.huff");
             exit(1);
         }
 
@@ -131,7 +133,7 @@ int main(int argc, char *argv[]) {
             remove("temp.lz");
         }
     } else {
-        perror("Invalid option. Use -c for compression or -d for decompression.");
+        printf("Invalid option. Use -c for compression or -d for decompression.");
         return 1;
     }
 
