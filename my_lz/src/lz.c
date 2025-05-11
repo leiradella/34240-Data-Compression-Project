@@ -1,12 +1,35 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
 #include "../headers/lz.h"
 
 #define WINDOW_SIZE 4096
 #define LOOKAHEAD_SIZE 18
 #define MIN_MATCH_LENGTH 3
+
+void find_best_match(char *sliding_window, char *lookahead, int position, int lookahead_filled, uint8_t *best_length, uint8_t *best_offset) {
+    for (int i = 0; i < position; i++) {
+        if (sliding_window[i] == lookahead[0]) {
+            //match!!
+            int current_length = 1;
+            int current_offset = i;
+            for (int j = 1; j < lookahead_filled; j++) {
+                if (i + j < position) {
+                    if (sliding_window[i + j] == lookahead[j]) {
+                        current_length++;
+                    }
+                    else break;
+                }
+                else break;
+            }
+            if (current_length > *best_length) {
+                *best_length = current_length;
+                *best_offset = current_offset;
+            }
+        }
+    }
+    if (*best_length > 15) {
+        *best_length = 15; //max length is 15
+    }
+}
+
 
 void compress_lzss(FILE *in, FILE *out) {
 
@@ -29,29 +52,8 @@ void compress_lzss(FILE *in, FILE *out) {
         int best_length = 0;
         int best_offset = 0;
 
-        for (int i = 0; i < position; i++) {
-            if (sliding_window[i] == lookahead[0]) {
-                //match!!
-                int current_length = 1;
-                int current_offset = i;
-                for (int j = 1; j < lookahead_filled; j++) {
-                    if (i+j < position) {
-                        if (sliding_window[i+j] == lookahead[j]) {
-                            current_length++;
-                        }
-                        else break;
-                    }
-                    else break;
-                }
-                if (current_length > best_length) {
-                    best_length = current_length;
-                    best_offset = current_offset;
-                }
-            }
-        }
-        if (best_length > 15) {
-            best_length = 15; //max length is 15
-        }
+        find_best_match(sliding_window, lookahead, position, lookahead_filled, &best_length, &best_offset);
+
         int length = 0;
         if (best_length < MIN_MATCH_LENGTH) { //single
             //here we set the lenght to 1 for the memcpy into the window buffer, set the
