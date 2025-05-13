@@ -4,7 +4,7 @@
 #define LOOKAHEAD_SIZE 18
 #define MIN_MATCH_LENGTH 3
 
-void find_best_match(char *sliding_window, char *lookahead, int position, int lookahead_filled, uint8_t *best_length, uint8_t *best_offset) {
+void find_best_match(char *sliding_window, char *lookahead, int position, int lookahead_filled, int *best_length, int *best_offset) {
     for (int i = 0; i < position; i++) {
         if (sliding_window[i] == lookahead[0]) {
             //match!!
@@ -106,8 +106,8 @@ void compress_lzss(FILE *in, FILE *out) {
         memmove(lookahead, lookahead + length, LOOKAHEAD_SIZE - length);
         lookahead_filled += fread(lookahead + lookahead_filled, 1, LOOKAHEAD_SIZE - lookahead_filled, in);
     }
+    //put any leftover bits in the file
     while (count < 8) {
-        // pad with 0 (match), and dummy offset/length (safe and decodes to 0-length)
         output[output_index++] = 0;
         output[output_index++] = 0;
         count++;

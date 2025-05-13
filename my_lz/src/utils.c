@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 FILE *open_file(const char *filename, const char *mode) {
     FILE *file = fopen(filename, mode);
@@ -17,7 +18,7 @@ ProgramOptions parse_arguments(int argc, char *argv[]) {
     //initialize the options to default values
     options.compress = 0;
     options.decompress = 0;
-    options.use_huffman = 1; // use huffman by default
+    options.use_huffman = 1; //use huffman by default
     options.use_lossy = 0;
     options.quantization_factor = 0;
     options.input_filename = NULL;
@@ -99,8 +100,8 @@ void copy_header(FILE *in, FILE *out, char *filename) {
     //move 1 byte forward to skip the dot
     char *extension = dot_extension + 1;
 
-    if (strcmp(extension, "bmp") == 0) {
-        int header_size = 54; // BMP header size
+    if (strcasecmp(extension, "bmp") == 0) {
+        int header_size = 54; 
         for (int i = 0; i < header_size; i++) {
             int c = fgetc(in);
             if (c == EOF) {
@@ -109,8 +110,8 @@ void copy_header(FILE *in, FILE *out, char *filename) {
             }
             fputc(c, out);
         }
-    } else if (strcmp(extension, "tiff") == 0) {
-        int header_size = 8; // TIFF header size
+    } else if (strcasecmp(extension, "tiff") == 0) {
+        int header_size = 8;
         for (int i = 0; i < header_size; i++) {
             int c = fgetc(in);
             if (c == EOF) {

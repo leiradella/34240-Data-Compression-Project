@@ -19,7 +19,6 @@ void generate_codes(HuffmanNode *node, HuffmanCode *codes, uint32_t code, uint8_
     generate_codes(node->right, codes, (code << 1) | 1, length + 1);
 }
 
-// Implement Huffman compressions
 void compress_huffman(FILE *in, FILE *out) {
     //frequency table
     int frequency[256] = {0};
@@ -113,7 +112,7 @@ void compress_huffman(FILE *in, FILE *out) {
         buffer_filled = fread(buffer, 1, 8, in);
     }
 
-    // Write any leftover bits (pad with 0s on the right)
+    //write leftover bits with 0s to the right
     if (bit_count > 0) {
         output_byte <<= (8 - bit_count);
         fputc(output_byte, out);
@@ -124,7 +123,7 @@ HuffmanNode *build_huffman_tree(int *freq) {
     HuffmanNode *nodes[256];
     int num_nodes = 0;
 
-    // Create a node for each symbol with non-zero frequency
+    //create a node for every non 0 frequency
     for (int i = 0; i < 256; i++) {
         if (freq[i] > 0) {
             nodes[num_nodes] = (HuffmanNode *)malloc(sizeof(HuffmanNode));
